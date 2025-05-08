@@ -115,6 +115,8 @@
 
 import os
 import shutil
+import sqlite3
+import time
 from tkinter import Tk, Label, Entry, Button, Canvas, Frame, Scrollbar, Toplevel
 from PIL import Image, ImageTk
 import pandas as pd
@@ -125,12 +127,91 @@ excel_file_path = "E:\\LastSemProject\\OCR-Free-Model\\DocParser-Pytorch\\datase
 def open_image(image_path):
     os.startfile(image_path)
 
+def search_images_via_db(event=None):
+    search_text = entry_search.get()
+    conn = sqlite3.connect('image_data.db')
+    c = conn.cursor()
+
+    query = "SELECT image_name FROM image_text_index WHERE extracted_text MATCH ?"
+    start_time = time.time()
+    c.execute(query, (search_text,))
+    end_time = time.time()
+
+    print(f'Search time : {end_time - start_time}')
+    results = c.fetchall()
+
+    conn.close()
+
+    if results:
+        image_paths = []
+        folder_path = os.path.dirname(excel_file_path)
+        result_folder_path = os.path.join(folder_path, "search_results")
+
+        os.makedirs(result_folder_path, exist_ok=True)
+
+        for row in results:
+            image_name = row[0]
+            image_path = os.path.join(folder_path, image_name)
+            result_image_path = os.path.join(result_folder_path, image_name)
+            shutil.copy(image_path, result_image_path)
+            image_paths.append(result_image_path)
+
+        # ... show images as before
+        print(f'Image paths: {image_paths}')
+
+        # ✅ Use Toplevel instead of Tk for new window
+        image_window = Toplevel(root)
+        image_window.title("Search Results")
+        image_window.geometry("450x500")
+
+        canvas = Canvas(image_window, borderwidth=0)
+        frame = Frame(canvas)
+        vsb = Scrollbar(image_window, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        canvas.create_window((4, 4), window=frame, anchor="nw")
+
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        frame.bind("<Configure>", on_frame_configure)
+
+        image_refs = []
+        frame.image_refs = image_refs  # ✅ Prevent garbage collection
+
+        image_size = 200
+        num_cols = 2
+
+        def make_click_handler(img_path):
+            return lambda e: open_image(img_path)
+
+        for idx, img_path in enumerate(image_paths):
+            try:
+                img = Image.open(img_path)
+                img = img.resize((image_size, image_size), Image.Resampling.LANCZOS)
+                img_tk = ImageTk.PhotoImage(img)
+                image_refs.append(img_tk)
+
+                lbl = Label(frame, image=img_tk, cursor="hand2")
+                lbl.grid(row=idx // num_cols, column=idx % num_cols, padx=10, pady=10)
+                lbl.bind("<Button-1>", make_click_handler(img_path))
+            except Exception as e:
+                print(f"Failed to load image: {img_path}, Error: {e}")
+    else:
+        Label(root, text="No images found.", font=("Helvetica", 10), pady=10).pack()
+
+
 def search_images(event=None):
     search_text = entry_search.get()
 
+    start_time = time.time()
     # Filter rows containing the search text
     filtered_df = df[df['Extracted Text'].str.contains(search_text, case=False, na=False)]
+    end_time = time.time()  # ⏱ End timing
 
+    print(f"Search took {end_time - start_time:.4f} seconds")
     if not filtered_df.empty:
         folder_path = os.path.dirname(excel_file_path)
         result_folder_path = os.path.join(folder_path, "search_results")
@@ -211,7 +292,7 @@ if os.path.exists(excel_file_path):
     entry_search = Entry(root)
     entry_search.pack(pady=10)
 
-    button_search = Button(root, text="Search", command=search_images)
+    button_search = Button(root, text="Search", command=search_images_via_db)
     button_search.pack()
 
     # Center the main window
@@ -224,7 +305,7 @@ if os.path.exists(excel_file_path):
 
     root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
 
-    root.bind('<Return>', search_images)
+    root.bind('<Return>', search_images_via_db)
 
     root.mainloop()
 else:

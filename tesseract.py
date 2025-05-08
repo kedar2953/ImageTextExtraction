@@ -4,6 +4,8 @@ import os
 import openpyxl
 from tkinter import Tk
 from tkinter.filedialog import askdirectory
+import pandas as pd
+import sqlite3
 
 # Path to the Tesseract executable (change this according to your configuration)
 pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
@@ -12,7 +14,18 @@ print("Hello")
 Tk().withdraw()  # Hide the main tkinter window
 print("HI")
 folder_path = askdirectory(title="Select a folder containing images")
+def import_excel_to_db(excel_file_path_for_db):
+    df = pd.read_excel(excel_file_path_for_db)
 
+    conn = sqlite3.connect('image_data.db')
+    c = conn.cursor()
+
+    for _, row in df.iterrows():
+        c.execute('INSERT INTO image_text_index (image_name, extracted_text) VALUES (?, ?)',
+                  (row['Image Name'], row['Extracted Text']))
+
+    conn.commit()
+    conn.close()
 # Check if a folder was selected
 if folder_path:
     # Create an Excel workbook and add a worksheet
@@ -48,7 +61,12 @@ if folder_path:
 
     # Save the Excel file
     workbook.save(excel_file_path)
-
+    import_excel_to_db("E:\\LastSemProject\\OCR-Free-Model\\DocParser-Pytorch\\dataset\\training_data\\images\\extracted_text.xlsx")
     print("Extraction complete. Extracted text is saved in:", excel_file_path)
 else:
     print("No folder selected.")
+
+
+
+
+
