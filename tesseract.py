@@ -7,9 +7,10 @@ from tkinter.filedialog import askdirectory
 
 # Path to the Tesseract executable (change this according to your configuration)
 pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
-
+print("Hello")
 # Open a file dialog for the user to select a folder containing images
 Tk().withdraw()  # Hide the main tkinter window
+print("HI")
 folder_path = askdirectory(title="Select a folder containing images")
 
 # Check if a folder was selected
