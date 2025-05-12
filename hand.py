@@ -7,24 +7,19 @@ import tkinter as tk
 from tkinter import filedialog
 from tqdm import tqdm  # Import the tqdm library for progress bar
 
-# Set the logging level to ERROR for the transformers library
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
-# Create a Tkinter window and hide it
 root = tk.Tk()
 root.withdraw()
 
-# Ask the user for the directory containing images
 directory_path = filedialog.askdirectory(title="Select a Directory")
 
 if not directory_path:
     print("No directory selected. Exiting.")
 else:
-    # Initialize lists to store image names and extracted text
     image_names = []
     extracted_texts = []
 
-    # Load processor and model
     processor = TrOCRProcessor.from_pretrained('microsoft/trocr-base-handwritten')
     model = VisionEncoderDecoderModel.from_pretrained('microsoft/trocr-base-handwritten')
 

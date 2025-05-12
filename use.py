@@ -118,14 +118,79 @@ import shutil
 import sqlite3
 import time
 from tkinter import Tk, Label, Entry, Button, Canvas, Frame, Scrollbar, Toplevel
-from PIL import Image, ImageTk
+from tkinter import filedialog
+
+import cv2
+import openpyxl
 import pandas as pd
+import pytesseract
+from PIL import Image, ImageTk
+from plyer import notification
 
 # Path to the Excel file
 excel_file_path = "E:\\LastSemProject\\OCR-Free-Model\\DocParser-Pytorch\\dataset\\training_data\\images\\extracted_text.xlsx"
 
 def open_image(image_path):
     os.startfile(image_path)
+
+def add_image():
+    file_path = filedialog.askopenfilename(
+        title="Select an Image",
+        filetypes=[("Image files", "*.jpg *.png *.jpeg *.bmp")]
+    )
+
+    if not file_path:
+        return  # No file selected
+
+    # Target folder where images are stored and Excel is saved
+    folder_path = "E:\\LastSemProject\\OCR-Free-Model\\DocParser-Pytorch\\dataset\\training_data\\images"
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Copy the image to the folder
+    image_name = os.path.basename(file_path)
+    target_path = os.path.join(folder_path, image_name)
+    shutil.copy(file_path, target_path)
+
+    # Extract text using pytesseract
+    image = cv2.imread(target_path)
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    extracted_text = pytesseract.image_to_string(gray_image)
+
+    # Append to Excel
+    excel_file_path = os.path.join(folder_path, "extracted_text.xlsx")
+    if not os.path.exists(excel_file_path):
+        # Create file with headers
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = "Extracted Text"
+        sheet["A1"] = "Image Name"
+        sheet["B1"] = "Extracted Text"
+        workbook.save(excel_file_path)
+
+    # Use pandas to append
+    df = pd.read_excel(excel_file_path)
+    new_row = pd.DataFrame([[image_name, extracted_text]], columns=['Image Name', 'Extracted Text'])
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_excel(excel_file_path, index=False)
+
+    # Insert into SQLite DB
+    try:
+        conn = sqlite3.connect('image_data.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO image_text_index (image_name, extracted_text) VALUES (?, ?)",
+                  (image_name, extracted_text))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("DB insertion error:", e)
+
+    print(f"Image '{image_name}' added, text extracted and stored.")
+    notification.notify(
+        title="Image Added",
+        message=f"'{image_name}' was added and processed successfully.",
+        timeout=5  # seconds
+    )
+
 
 def search_images_via_db(event=None):
     search_text = entry_search.get()
@@ -276,8 +341,9 @@ def search_images(event=None):
 
 # ========== Main GUI Code ==========
 
-if os.path.exists(excel_file_path):
-    df = pd.read_excel(excel_file_path)
+if True:
+    # df = pd.read_excel(excel_file_path)
+    df = pd.read_sql_query("SELECT * FROM image_text_index", sqlite3.connect('image_data.db'))
     print(df.columns.tolist())
 
     root = Tk()
@@ -294,7 +360,8 @@ if os.path.exists(excel_file_path):
 
     button_search = Button(root, text="Search", command=search_images_via_db)
     button_search.pack()
-
+    button_add = Button(root, text="Add Image", command=add_image)
+    button_add.pack(pady=5)
     # Center the main window
     window_width = 400
     window_height = 200
