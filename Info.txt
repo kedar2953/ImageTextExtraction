@@ -1,0 +1,8 @@
+
+For running the sql:
+    .mode column
+    .headers on
+    SELECT * FROM image_text_index;
+
+
+Can have db browser for sqlite to view table in gui
